@@ -33,7 +33,7 @@
 
 #import "SwipeView.h"
 #import <objc/message.h>
-
+#import <iOSHelper.h>
 
 #pragma GCC diagnostic ignored "-Wdirect-ivar-access"
 #pragma GCC diagnostic ignored "-Warc-repeated-use-of-weak"
@@ -67,7 +67,6 @@
 
 @interface SwipeView () <UIScrollViewDelegate, UIGestureRecognizerDelegate>
 
-@property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) NSMutableDictionary *itemViews;
 @property (nonatomic, strong) NSMutableSet *itemViewPool;
 @property (nonatomic, assign) NSInteger previousItemIndex;
@@ -82,6 +81,7 @@
 @property (nonatomic, assign) CGFloat endOffset;
 @property (nonatomic, assign) CGFloat lastUpdateOffset;
 @property (nonatomic, strong) NSTimer *timer;
+@property (nonatomic, assign) CGFloat currentNewItemSlotFrameCenter;
 
 @end
 
@@ -126,6 +126,7 @@
     _scrollOffset = 0.0f;
     _currentItemIndex = 0;
     _numberOfItems = 0;
+    _currentNewItemSlotFrameCenter = -1.f;
     
     UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(didTap:)];
     tapGesture.delegate = self;
@@ -135,7 +136,7 @@
     
     //place scrollview at bottom of hierarchy
     [self insertSubview:_scrollView atIndex:0];
-    
+        
     if (_dataSource)
     {
         [self reloadData];
@@ -301,6 +302,13 @@
     return _scrollView.decelerating;
 }
 
+- (void)setBackgroundView:(UIView *)backgroundView {
+    if (_backgroundView != nil) [_backgroundView removeFromSuperview];
+
+    _backgroundView = backgroundView;
+    
+    [self insertSubview:_backgroundView atIndex:0];
+}
 
 #pragma mark -
 #pragma mark View management
@@ -314,6 +322,111 @@
 {
     NSArray *indexes = [self indexesForVisibleItems];
     return [_itemViews objectsForKeys:indexes notFoundMarker:[NSNull null]];
+}
+
+- (NSArray *)visibleItemViewsSortedByFrameOriginXAscending {
+    NSArray *views = [self visibleItemViews];
+    NSComparator comparatorBlock = ^(UIView *obj1, UIView *obj2) {
+        if (obj1.frame.origin.x > obj2.frame.origin.x) {
+            return (NSComparisonResult)NSOrderedDescending;
+        }
+        
+        if (obj1.frame.origin.x < obj2.frame.origin.x) {
+            return (NSComparisonResult)NSOrderedAscending;
+        }
+        return (NSComparisonResult)NSOrderedSame;
+    };
+    
+    return [views sortedArrayUsingComparator:comparatorBlock];
+}
+
+- (void)movedInsertionView:(UIView *)insertionView {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(animateViewsAwayFromView:) object:insertionView];
+    [self performSelector:@selector(animateViewsAwayFromView:) withObject:insertionView afterDelay:0.25];
+}
+
+- (void)animateViewsAwayFromView:(UIView *)view {
+    CGRect rectConvertedToScrollView = [view.superview convertRect:view.frame toView:_scrollView];
+    CGPoint centerOfConvertedView = KGRectCenter(rectConvertedToScrollView);
+    //if there already is a slot for the new item
+    if (_currentNewItemSlotFrameCenter > -1) {
+        //do nothing if new item moves arounds somewhere next to the slot
+        if (centerOfConvertedView.x > _currentNewItemSlotFrameCenter - _itemSize.width && centerOfConvertedView.x < _currentNewItemSlotFrameCenter + _itemSize.width) {
+            NSLog(@"is in area of new slot, returning with no animation");
+            return;
+        }
+    }
+    
+    //find new slot
+    CGFloat distance = CGFLOAT_MAX;
+    UIView *minDistanceView = nil;
+    NSArray *items = [self visibleItemViewsSortedByFrameOriginXAscending];
+    for (UIView *v in items) {
+        CGFloat dist = KGDistanceBetweenCGPoints(v.center, centerOfConvertedView);
+        if (dist < distance) minDistanceView = v;
+        distance = MIN(dist, distance);
+    }
+    _currentNewItemSlotFrameCenter = minDistanceView.center.x;
+    
+    //animate views lef/right depending on current position of this view
+    
+    NSMutableArray *intersectingViews = [NSMutableArray array];
+    
+    for (UIView *v in items) {
+        if (v.frameLeft - _itemSize.width/4.f >= _scrollView.contentOffset.x && v.frameRight + _itemSize.width/4.f <= _scrollView.contentOffset.x + _scrollView.frameWidth) {
+            NSLog(@"view with index %i is inside", v.tag);
+            [intersectingViews addObject:v];
+        }
+//        CGRect rect = [self convertRect:v.frame fromView:_scrollView];
+//        NSLog(@"x: %f, offset: %f", v.frameLeft, _scrollView.contentOffset.x);
+//        if (CGRectIntersectsRect(v.frame, rectConvertedToScrollView)) {
+//            [intersectingViews addObject:v];
+//        }
+    }
+
+    //now we have views that could be moved left/right to give space for the new item
+    //decide if we move those left or right
+    
+    
+    //two views intersect. decide which one to move  (left/right)
+    if (intersectingViews.count == 2) {
+        UIView *theView = nil;
+        UIView *v1 = intersectingViews[0];
+        UIView *v2 = intersectingViews[1];
+        
+        CGFloat dist1 = KGDistanceBetweenCGPoints(v1.center, KGRectCenter(rectConvertedToScrollView));
+        CGFloat dist2 = KGDistanceBetweenCGPoints(v2.center, KGRectCenter(rectConvertedToScrollView));
+        NSLog(@"d1: %f, d2: %f", dist1, dist2);
+        //view 1 is nearer
+        BOOL useFirst = (dist1 < dist2);
+        theView = useFirst ? v1 : v2;
+        
+        int moveLeftIndex = [items indexOfObject:theView] + (useFirst ? 0 : 1);
+//        CGRect rect = [self convertRect:theView.frame fromView:_scrollView];
+        CGFloat posX = theView.frame.origin.x;
+        _currentNewItemSlotFrameCenter = theView.center.x;
+        
+        [UIView animateWithDuration:.25f delay:0.0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+            for (int i = 0; i < items.count; i++) {
+                UIView *v = items[i];
+                
+                if (i <= moveLeftIndex) {
+                    v.frameLeft = posX + ((i - moveLeftIndex - 1) * _itemSize.width);
+                }
+                else {
+                    v.frameLeft = posX + ((i - moveLeftIndex) * _itemSize.width);
+                }
+            }
+        } completion:^ (BOOL completed) {
+            
+        }];
+    }
+    
+    
+    
+    
+    
+    
 }
 
 - (UIView *)itemViewAtIndex:(NSInteger)index
@@ -565,6 +678,10 @@
     [self updateScrollOffset];
     [self loadUnloadViews];
     [self layOutItemViews];
+    
+    if (_backgroundView != nil) {
+        _backgroundView.frame = _scrollView.frame;
+    }
 }
 
 - (void)layoutSubviews

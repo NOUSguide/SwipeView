@@ -59,6 +59,7 @@ typedef NS_ENUM(NSUInteger, SwipeViewAlignment)
 
 @interface SwipeView : UIView
 
+@property (nonatomic, readonly) UIScrollView *scrollView;
 @property (nonatomic, weak_delegate) IBOutlet id<SwipeViewDataSource> dataSource;
 @property (nonatomic, weak_delegate) IBOutlet id<SwipeViewDelegate> delegate;
 @property (nonatomic, readonly) NSInteger numberOfItems;
@@ -85,6 +86,8 @@ typedef NS_ENUM(NSUInteger, SwipeViewAlignment)
 @property (nonatomic, readonly, getter = isScrolling) BOOL scrolling;
 @property (nonatomic, assign) BOOL defersItemViewLoading;
 @property (nonatomic, assign, getter = isVertical) BOOL vertical;
+@property (nonatomic, strong) UIView *backgroundView;
+
 
 - (void)reloadData;
 - (void)reloadItemAtIndex:(NSInteger)index;
@@ -94,8 +97,11 @@ typedef NS_ENUM(NSUInteger, SwipeViewAlignment)
 - (void)scrollToItemAtIndex:(NSInteger)index duration:(NSTimeInterval)duration;
 - (void)scrollToPage:(NSInteger)page duration:(NSTimeInterval)duration;
 - (UIView *)itemViewAtIndex:(NSInteger)index;
+- (CGFloat)offsetForItemAtIndex:(NSInteger)index;
 - (NSInteger)indexOfItemView:(UIView *)view;
 - (NSInteger)indexOfItemViewOrSubview:(UIView *)view;
+- (NSArray *)visibleItemViewsSortedByFrameOriginXAscending;
+- (void)movedInsertionView:(UIView *)insertionView;
 
 @end
 

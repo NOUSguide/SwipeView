@@ -67,6 +67,7 @@
 
 @interface SwipeView () <UIScrollViewDelegate, UIGestureRecognizerDelegate>
 
+@property (nonatomic, strong) CAGradientLayer *leftRightFadeOutGradientLayer;
 @property (nonatomic, strong) NSMutableDictionary *itemViews;
 @property (nonatomic, strong) NSMutableSet *itemViewPool;
 @property (nonatomic, assign) NSInteger previousItemIndex;
@@ -136,7 +137,7 @@
     
     //place scrollview at bottom of hierarchy
     [self insertSubview:_scrollView atIndex:0];
-        
+    
     if (_dataSource)
     {
         [self reloadData];
@@ -308,6 +309,23 @@
     _backgroundView = backgroundView;
     
     [self insertSubview:_backgroundView atIndex:0];
+}
+
+- (void)setFadeOutLeftAndRight:(BOOL)fadeOutLeftAndRight {
+    _fadeOutLeftAndRight = fadeOutLeftAndRight;
+    
+    if (_fadeOutLeftAndRight) {
+        self.leftRightFadeOutGradientLayer = [CAGradientLayer layer];
+        _leftRightFadeOutGradientLayer.locations = @[[NSNumber numberWithFloat:0.0],
+                                                     [NSNumber numberWithFloat:0.01],
+                                                     [NSNumber numberWithFloat:0.99],
+                                                     [NSNumber numberWithFloat:1.0]];
+        _leftRightFadeOutGradientLayer.colors = [NSArray arrayWithObjects:(id)[UIColor clearColor].CGColor, (id)[UIColor whiteColor].CGColor, (id)[UIColor whiteColor].CGColor, (id)[UIColor clearColor].CGColor, nil];
+        _leftRightFadeOutGradientLayer.anchorPoint = CGPointZero;
+        _leftRightFadeOutGradientLayer.startPoint = CGPointMake(0.0f, 0.5f);
+        _leftRightFadeOutGradientLayer.endPoint = CGPointMake(1.0f, 0.5f);
+        self.layer.mask = _leftRightFadeOutGradientLayer;
+    }
 }
 
 #pragma mark -
@@ -681,6 +699,10 @@
     
     if (_backgroundView != nil) {
         _backgroundView.frame = _scrollView.frame;
+    }
+    
+    if (_leftRightFadeOutGradientLayer) {
+        _leftRightFadeOutGradientLayer.bounds = CGRectMake(0.f, 0.f, self.frameWidth, self.frameHeight);
     }
 }
 

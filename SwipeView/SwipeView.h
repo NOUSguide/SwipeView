@@ -88,6 +88,7 @@ typedef NS_ENUM(NSUInteger, SwipeViewAlignment)
 @property (nonatomic, assign) BOOL defersItemViewLoading;
 @property (nonatomic, assign, getter = isVertical) BOOL vertical;
 @property (nonatomic, strong) UIView *backgroundView;
+@property (nonatomic, strong) UIImage *scrollableBackgroundImage;
 
 
 - (void)reloadData;

@@ -83,6 +83,7 @@
 @property (nonatomic, assign) CGFloat lastUpdateOffset;
 @property (nonatomic, strong) NSTimer *timer;
 @property (nonatomic, assign) CGFloat currentNewItemSlotFrameCenter;
+@property (nonatomic, strong) CAScrollLayer *scrollLayer;
 
 @end
 
@@ -311,14 +312,34 @@
     [self insertSubview:_backgroundView atIndex:0];
 }
 
+- (void)setScrollableBackgroundImage:(UIImage *)scrollableBackgroundImage {
+    _scrollableBackgroundImage = scrollableBackgroundImage;
+    
+    if (_backgroundView == nil) {
+        self.backgroundView = [UIView new];
+        _backgroundView.frameSize = self.frameSize;
+        [self setBackgroundView:_backgroundView];
+    }
+    
+    if (_scrollLayer == nil) {
+        self.scrollLayer = [CAScrollLayer layer];
+        _scrollLayer.transform = CATransform3DMakeScale(1.0, -1.0, 1.0);
+        _scrollLayer.scrollMode = kCAScrollVertically;
+        _scrollLayer.position = CGPointMake(_backgroundView.center.x, _backgroundView.center.y);
+        [_backgroundView.layer addSublayer:_scrollLayer];
+    }
+    
+    _scrollLayer.backgroundColor = [UIColor colorWithPatternImage:scrollableBackgroundImage].CGColor;
+}
+
 - (void)setFadeOutLeftAndRight:(BOOL)fadeOutLeftAndRight {
     _fadeOutLeftAndRight = fadeOutLeftAndRight;
     
     if (_fadeOutLeftAndRight) {
         self.leftRightFadeOutGradientLayer = [CAGradientLayer layer];
         _leftRightFadeOutGradientLayer.locations = @[[NSNumber numberWithFloat:0.0],
-                                                     [NSNumber numberWithFloat:0.01],
-                                                     [NSNumber numberWithFloat:0.99],
+                                                     [NSNumber numberWithFloat:0.03],
+                                                     [NSNumber numberWithFloat:0.97],
                                                      [NSNumber numberWithFloat:1.0]];
         _leftRightFadeOutGradientLayer.colors = [NSArray arrayWithObjects:(id)[UIColor clearColor].CGColor, (id)[UIColor whiteColor].CGColor, (id)[UIColor whiteColor].CGColor, (id)[UIColor clearColor].CGColor, nil];
         _leftRightFadeOutGradientLayer.anchorPoint = CGPointZero;
@@ -699,6 +720,10 @@
     
     if (_backgroundView != nil) {
         _backgroundView.frame = _scrollView.frame;
+        
+        if (_scrollLayer != nil) {
+            _scrollLayer.bounds = CGRectMake(0, 0, _backgroundView.bounds.size.width, _backgroundView.bounds.size.height);
+        }
     }
     
     if (_leftRightFadeOutGradientLayer) {
@@ -750,6 +775,14 @@
     
     //update view
     [self layOutItemViews];
+    
+    if (_scrollLayer != nil) {
+        [CATransaction begin];
+        [CATransaction setValue:[NSNumber numberWithFloat:0.0f] forKey:kCATransactionAnimationDuration];
+        [_scrollLayer scrollToPoint:CGPointMake(0.f, -_scrollView.contentOffset.y)]; //invert the offset because the CAScrollLayer is scaled to flip the background image
+        [CATransaction commit];
+    }
+    
     [_delegate swipeViewDidScroll:self];
     
     if (!_defersItemViewLoading || fabsf([self minScrollDistanceFromOffset:_lastUpdateOffset toOffset:_scrollOffset]) >= 1.0f)

@@ -84,6 +84,9 @@
 @property (nonatomic, strong) NSTimer *timer;
 @property (nonatomic, assign) CGFloat currentNewItemSlotFrameCenter;
 @property (nonatomic, strong) CAScrollLayer *scrollLayer;
+@property (nonatomic, strong) NSMutableArray *itemInsertionItems;
+@property (nonatomic, strong) NSMutableArray *currentCenterXSlots;
+@property (nonatomic, assign) NSInteger indexOfCurrentNewItemSlot;
 
 @end
 
@@ -104,6 +107,10 @@
     _truncateFinalPage = NO;
     _defersItemViewLoading = NO;
     _vertical = NO;
+    _itemInsertionState = SwipeViewItemInsertionStateInactive;
+    _itemInsertionItems = [NSMutableArray array];
+    _currentCenterXSlots = [NSMutableArray array];
+    _indexOfCurrentNewItemSlot = NSNotFound;
     
     _scrollView = [[UIScrollView alloc] init];
     _scrollView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
@@ -349,6 +356,40 @@
     }
 }
 
+- (void)setItemInsertionState:(SwipeViewItemInsertionState)itemInsertionState {
+    _itemInsertionState = itemInsertionState;
+    
+    switch (_itemInsertionState) {
+        case SwipeViewItemInsertionStateInactive:
+            break;
+        case SwipeViewItemInsertionStateStarted: {
+            //stop scrolling
+            [_scrollView setContentOffset:_scrollView.contentOffset animated:NO];
+            //add all really visible items to the array
+            for (UIView *v in [self visibleItemViews]) {
+                CGRect convertedRect = [_scrollView convertRect:v.frame toView:self];
+                if (CGRectIntersectsRect(convertedRect, _scrollView.frame)) {
+                    [_itemInsertionItems addObject:v];
+                    [_currentCenterXSlots addObject:@(v.center.x)];
+                }
+//                if (CGRectContainsRect(_scrollView.frame, convertedRect)) {
+//                    [_itemInsertionItems addObject:v];
+//                }
+            }
+//            NSLog(@"items: %@", _itemInsertionItems);
+//            NSLog(@"slots: %@", _currentCenterXSlots);
+
+        } break;
+        case SwipeViewItemInsertionStateEnded: {
+            
+            [_itemInsertionItems removeAllObjects];
+            [_currentCenterXSlots removeAllObjects];
+        } break;
+        default:
+            break;
+    }
+}
+
 #pragma mark -
 #pragma mark View management
 
@@ -381,10 +422,45 @@
 
 - (void)movedInsertionView:(UIView *)insertionView {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(animateViewsAwayFromView:) object:insertionView];
-    [self performSelector:@selector(animateViewsAwayFromView:) withObject:insertionView afterDelay:0.25];
+    if (_itemInsertionState == SwipeViewItemInsertionStateStarted) {
+        //find new slot to insert item right now
+        CGRect convertedRect = [insertionView.superview convertRect:insertionView.frame toView:_scrollView];
+        CGFloat centerX = convertedRect.origin.x + convertedRect.size.width/2.f;
+        
+        //find nearest slotindex
+        CGFloat distance = MAXFLOAT;
+        int counter = 0;
+        for (NSNumber *n in _currentCenterXSlots) {
+            CGFloat dist = fabsf(n.floatValue - centerX);
+            if (dist < distance) {
+                _indexOfCurrentNewItemSlot = counter;
+            }
+            distance = dist;
+            
+            counter++;
+        }
+        
+//        KGLogRect(convertedRect);
+//        NSLog(@"centerx: %f", convertedRect.origin.x + convertedRect.size.width/2.f);
+        
+        //move away the other items
+        [self performSelector:@selector(animateViewsAwayFromView:) withObject:insertionView afterDelay:0.25];
+    }
 }
 
 - (void)animateViewsAwayFromView:(UIView *)view {
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    return;
     CGRect rectConvertedToScrollView = [view.superview convertRect:view.frame toView:_scrollView];
     CGPoint centerOfConvertedView = KGRectCenter(rectConvertedToScrollView);
     //if there already is a slot for the new item

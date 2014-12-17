@@ -54,6 +54,11 @@ typedef NS_ENUM(NSUInteger, SwipeViewAlignment)
     SwipeViewAlignmentCenter
 };
 
+typedef enum {
+    SwipeViewItemInsertionStateInactive,
+    SwipeViewItemInsertionStateStarted,
+    SwipeViewItemInsertionStateEnded
+} SwipeViewItemInsertionState;
 
 @protocol SwipeViewDataSource, SwipeViewDelegate;
 
@@ -89,6 +94,7 @@ typedef NS_ENUM(NSUInteger, SwipeViewAlignment)
 @property (nonatomic, assign, getter = isVertical) BOOL vertical;
 @property (nonatomic, strong) UIView *backgroundView;
 @property (nonatomic, strong) UIImage *scrollableBackgroundImage;
+@property (nonatomic, assign) SwipeViewItemInsertionState itemInsertionState;
 
 
 - (void)reloadData;

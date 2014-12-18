@@ -363,11 +363,17 @@
         case SwipeViewItemInsertionStateInactive:
             break;
         case SwipeViewItemInsertionStateStarted: {
+            [_itemInsertionItems removeAllObjects];
+            [_currentCenterXSlots removeAllObjects];
+            
             //stop scrolling
             [_scrollView setContentOffset:_scrollView.contentOffset animated:NO];
             //add all really visible items to the array
-            for (UIView *v in [self visibleItemViews]) {
-                CGRect convertedRect = [_scrollView convertRect:v.frame toView:self];
+            for (UIView *v in [self visibleItemViewsSortedByFrameOriginXAscending]) {
+                CGRect rect = CGRectZero;
+                rect.size = _itemSize;
+                rect.origin = v.center;
+                CGRect convertedRect = [_scrollView convertRect:rect toView:self];
                 if (CGRectIntersectsRect(convertedRect, _scrollView.frame)) {
                     [_itemInsertionItems addObject:v];
                     [_currentCenterXSlots addObject:@(v.center.x)];
@@ -376,14 +382,32 @@
 //                    [_itemInsertionItems addObject:v];
 //                }
             }
-//            NSLog(@"items: %@", _itemInsertionItems);
-//            NSLog(@"slots: %@", _currentCenterXSlots);
 
         } break;
+        case SwipeViewItemInsertionStateEndedWithoutInsertion: {
+            for (NSInteger i = 0; i < _itemInsertionItems.count; i++) {
+                NSNumber *n = _currentCenterXSlots[i];
+                CGFloat originalCenterX = n.floatValue;
+                UIView *v = _itemInsertionItems[i];
+                
+                [UIView animateWithDuration:.25f delay:0.0 options:UIViewAnimationOptionCurveEaseIn animations:^{
+                    v.centerX = originalCenterX;
+                    
+                    if (_delegate && [_delegate respondsToSelector:@selector(scaleForItemInSwipeView:atPosition:)]) {
+                        CATransform3D transform = CATransform3DIdentity;
+                        transform.m34 = -1.f/500.f;
+                        CGRect rect = [_scrollView convertRect:v.frame toView:self];
+                        CGFloat scale = [_delegate scaleForItemInSwipeView:self atPosition:CGRectGetMidX(rect)];
+                        transform = CATransform3DScale(transform, scale, scale, 1);
+                        v.layer.transform = transform;
+                    }
+                    
+                } completion:^ (BOOL completed) {
+                    
+                }];
+            }
+        } break;
         case SwipeViewItemInsertionStateEnded: {
-            
-            [_itemInsertionItems removeAllObjects];
-            [_currentCenterXSlots removeAllObjects];
         } break;
         default:
             break;
@@ -432,116 +456,78 @@
         int counter = 0;
         for (NSNumber *n in _currentCenterXSlots) {
             CGFloat dist = fabsf(n.floatValue - centerX);
-            if (dist < distance) {
+            if (dist <= distance) {
                 _indexOfCurrentNewItemSlot = counter;
             }
             distance = dist;
             
             counter++;
         }
-        
-//        KGLogRect(convertedRect);
-//        NSLog(@"centerx: %f", convertedRect.origin.x + convertedRect.size.width/2.f);
-        
+        NSLog(@"indexof slot: %i", _indexOfCurrentNewItemSlot);
         //move away the other items
         [self performSelector:@selector(animateViewsAwayFromView:) withObject:insertionView afterDelay:0.25];
     }
 }
 
 - (void)animateViewsAwayFromView:(UIView *)view {
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    return;
-    CGRect rectConvertedToScrollView = [view.superview convertRect:view.frame toView:_scrollView];
-    CGPoint centerOfConvertedView = KGRectCenter(rectConvertedToScrollView);
-    //if there already is a slot for the new item
-    if (_currentNewItemSlotFrameCenter > -1) {
-        //do nothing if new item moves arounds somewhere next to the slot
-        if (centerOfConvertedView.x > _currentNewItemSlotFrameCenter - _itemSize.width && centerOfConvertedView.x < _currentNewItemSlotFrameCenter + _itemSize.width) {
-            NSLog(@"is in area of new slot, returning with no animation");
-            return;
-        }
-    }
-    
-    //find new slot
-    CGFloat distance = CGFLOAT_MAX;
-    UIView *minDistanceView = nil;
-    NSArray *items = [self visibleItemViewsSortedByFrameOriginXAscending];
-    for (UIView *v in items) {
-        CGFloat dist = KGDistanceBetweenCGPoints(v.center, centerOfConvertedView);
-        if (dist < distance) minDistanceView = v;
-        distance = MIN(dist, distance);
-    }
-    _currentNewItemSlotFrameCenter = minDistanceView.center.x;
-    
-    //animate views lef/right depending on current position of this view
-    
-    NSMutableArray *intersectingViews = [NSMutableArray array];
-    
-    for (UIView *v in items) {
-        if (v.frameLeft - _itemSize.width/4.f >= _scrollView.contentOffset.x && v.frameRight + _itemSize.width/4.f <= _scrollView.contentOffset.x + _scrollView.frameWidth) {
-            NSLog(@"view with index %i is inside", v.tag);
-            [intersectingViews addObject:v];
-        }
-//        CGRect rect = [self convertRect:v.frame fromView:_scrollView];
-//        NSLog(@"x: %f, offset: %f", v.frameLeft, _scrollView.contentOffset.x);
-//        if (CGRectIntersectsRect(v.frame, rectConvertedToScrollView)) {
-//            [intersectingViews addObject:v];
-//        }
-    }
-
-    //now we have views that could be moved left/right to give space for the new item
-    //decide if we move those left or right
-    
-    
-    //two views intersect. decide which one to move  (left/right)
-    if (intersectingViews.count == 2) {
-        UIView *theView = nil;
-        UIView *v1 = intersectingViews[0];
-        UIView *v2 = intersectingViews[1];
-        
-        CGFloat dist1 = KGDistanceBetweenCGPoints(v1.center, KGRectCenter(rectConvertedToScrollView));
-        CGFloat dist2 = KGDistanceBetweenCGPoints(v2.center, KGRectCenter(rectConvertedToScrollView));
-        NSLog(@"d1: %f, d2: %f", dist1, dist2);
-        //view 1 is nearer
-        BOOL useFirst = (dist1 < dist2);
-        theView = useFirst ? v1 : v2;
-        
-        int moveLeftIndex = [items indexOfObject:theView] + (useFirst ? 0 : 1);
-//        CGRect rect = [self convertRect:theView.frame fromView:_scrollView];
-        CGFloat posX = theView.frame.origin.x;
-        _currentNewItemSlotFrameCenter = theView.center.x;
+    for (NSInteger i = 0; i < _itemInsertionItems.count; i++) {
+        NSNumber *n = _currentCenterXSlots[i];
+        CGFloat originalCenterX = n.floatValue;
+        UIView *v = _itemInsertionItems[i];
         
         [UIView animateWithDuration:.25f delay:0.0 options:UIViewAnimationOptionCurveEaseIn animations:^{
-            for (int i = 0; i < items.count; i++) {
-                UIView *v = items[i];
-                
-                if (i <= moveLeftIndex) {
-                    v.frameLeft = posX + ((i - moveLeftIndex - 1) * _itemSize.width);
-                }
-                else {
-                    v.frameLeft = posX + ((i - moveLeftIndex) * _itemSize.width);
-                }
+            //move left
+            if (i <= _indexOfCurrentNewItemSlot) {
+                v.centerX = originalCenterX - _itemSize.width;
             }
+            else {
+                v.centerX = originalCenterX;
+            }
+            
+            //animate scale
+            if (_delegate && [_delegate respondsToSelector:@selector(scaleForItemInSwipeView:atPosition:)]) {
+                CATransform3D transform = CATransform3DIdentity;
+                transform.m34 = -1.f/500.f;
+                CGRect rect = [_scrollView convertRect:v.frame toView:self];
+                CGFloat scale = [_delegate scaleForItemInSwipeView:self atPosition:CGRectGetMidX(rect)];
+                transform = CATransform3DScale(transform, scale, scale, 1);
+                v.layer.transform = transform;
+            }
+            
         } completion:^ (BOOL completed) {
             
         }];
     }
+}
+
+- (CGFloat)freeSlotCenterX {
+    CGFloat x = 0;
+    if (_indexOfCurrentNewItemSlot != NSNotFound) {
+        CGPoint center = CGPointMake(((NSNumber *)_currentCenterXSlots[_indexOfCurrentNewItemSlot]).floatValue, 0.f);
+        center = [_scrollView convertPoint:center toView:self.superview];
+        x = center.x;
+    }
     
+    return x;
+}
+
+
+- (UIView *)leftItemNextToInsertionItem {
+    UIView *item;
+    if (_indexOfCurrentNewItemSlot > 0) {
+        item = _itemInsertionItems[_indexOfCurrentNewItemSlot];
+    }
     
+    return item;
+}
+
+- (UIView *)rightItemNextToInsertionItem {
+    UIView *item;
+    if (_indexOfCurrentNewItemSlot < _itemInsertionItems.count - 1) {
+        item = _itemInsertionItems[_indexOfCurrentNewItemSlot+1];
+    }
     
-    
-    
-    
+    return item;
 }
 
 - (UIView *)itemViewAtIndex:(NSInteger)index

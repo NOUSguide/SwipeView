@@ -57,7 +57,8 @@ typedef NS_ENUM(NSUInteger, SwipeViewAlignment)
 typedef enum {
     SwipeViewItemInsertionStateInactive,
     SwipeViewItemInsertionStateStarted,
-    SwipeViewItemInsertionStateEnded
+    SwipeViewItemInsertionStateEnded,
+    SwipeViewItemInsertionStateEndedWithoutInsertion
 } SwipeViewItemInsertionState;
 
 @protocol SwipeViewDataSource, SwipeViewDelegate;
@@ -110,6 +111,9 @@ typedef enum {
 - (NSInteger)indexOfItemViewOrSubview:(UIView *)view;
 - (NSArray *)visibleItemViewsSortedByFrameOriginXAscending;
 - (void)movedInsertionView:(UIView *)insertionView;
+- (CGFloat)freeSlotCenterX;
+- (UIView *)leftItemNextToInsertionItem;
+- (UIView *)rightItemNextToInsertionItem;
 
 @end
 
@@ -135,7 +139,7 @@ typedef enum {
 - (void)swipeViewDidEndScrollingAnimation:(SwipeView *)swipeView;
 - (BOOL)swipeView:(SwipeView *)swipeView shouldSelectItemAtIndex:(NSInteger)index;
 - (void)swipeView:(SwipeView *)swipeView didSelectItemAtIndex:(NSInteger)index;
-
+- (CGFloat)scaleForItemInSwipeView:(SwipeView *)swipeView atPosition:(CGFloat)position;
 @end
 
 

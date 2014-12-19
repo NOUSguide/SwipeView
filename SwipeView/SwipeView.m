@@ -463,7 +463,7 @@
             
             counter++;
         }
-        NSLog(@"indexof slot: %i", _indexOfCurrentNewItemSlot);
+
         //move away the other items
         [self performSelector:@selector(animateViewsAwayFromView:) withObject:insertionView afterDelay:0.25];
     }
